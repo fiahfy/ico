@@ -12,7 +12,7 @@ npm install @fiahfy/ico
 import fs from 'fs'
 import Ico from '@fiahfy/ico'
 
-const buf = fs.readFileSync('input.png')
+const buf = fs.readFileSync('input.ico')
 const ico = new Ico(buf)
-console.log(ico.data) // <Buffer 00 00 01 00 ...
+console.log(ico.iconDir.count) // 7
 ```

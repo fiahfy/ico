@@ -35,7 +35,9 @@
   ],
   "homepage": "https://github.com/fiahfy/ico",
   "keywords": [
-    "ico"
+    "builder",
+    "ico",
+    "parser"
   ],
   "license": "MIT",
   "main": "dist/index.js",
