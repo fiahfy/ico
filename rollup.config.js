@@ -6,16 +6,14 @@ export default {
   output: [
     {
       file: pkg.main,
-      format: 'cjs',
-      exports: 'named'
+      format: 'cjs'
     },
     {
       file: pkg.module,
-      format: 'esm',
-      exports: 'named'
+      format: 'esm'
     }
   ],
-  external: ['file-type', 'jimp'],
+  external: ['jimp'],
   plugins: [
     babel({
       exclude: 'node_modules/**'

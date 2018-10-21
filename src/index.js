@@ -1,20 +1,26 @@
-import fileType from 'file-type'
 import Jimp from 'jimp'
 
-const iconDirSize = 6
-const iconDirEntrySize = 16
-const bitmapInfoHeaderSize = 40
-
-export class IconDir {
-  constructor({ reserved = 0, type = 1, count = 0, entries = [] } = {}) {
+class IcoFileHeader {
+  constructor({ reserved = 0, type = 1, count = 0 } = {}) {
     this.reserved = reserved
     this.type = type
     this.count = count
-    this.entries = entries
+  }
+  get data() {
+    const buffer = Buffer.alloc(6)
+    buffer.writeUInt16LE(this.reserved, 0)
+    buffer.writeUInt16LE(this.type, 2)
+    buffer.writeUInt16LE(this.count, 4)
+    return buffer
+  }
+  set data(buffer) {
+    this.reserved = buffer.readUInt16LE(0)
+    this.type = buffer.readUInt16LE(2)
+    this.count = buffer.readUInt16LE(4)
   }
 }
 
-export class IconDirEntry {
+class IcoInfoHeader {
   constructor({
     width = 0,
     height = 0,
@@ -34,35 +40,132 @@ export class IconDirEntry {
     this.bytesInRes = bytesInRes
     this.imageOffset = imageOffset
   }
+  get data() {
+    const buffer = Buffer.alloc(16)
+    buffer.writeUInt8(this.width, 0)
+    buffer.writeUInt8(this.height, 1)
+    buffer.writeUInt8(this.colorCount, 2)
+    buffer.writeUInt8(this.reserved, 3)
+    buffer.writeUInt16LE(this.planes, 4)
+    buffer.writeUInt16LE(this.bitCount, 6)
+    buffer.writeUInt32LE(this.bytesInRes, 8)
+    buffer.writeUInt32LE(this.imageOffset, 12)
+    return buffer
+  }
+  set data(buffer) {
+    this.width = buffer.readUInt8(0)
+    this.height = buffer.readUInt8(1)
+    this.colorCount = buffer.readUInt8(2)
+    this.reserved = buffer.readUInt8(3)
+    this.planes = buffer.readUInt16LE(4)
+    this.bitCount = buffer.readUInt16LE(6)
+    this.bytesInRes = buffer.readUInt32LE(8)
+    this.imageOffset = buffer.readUInt32LE(12)
+
+    if (this.bitCount !== 32) {
+      // TODO: only 32 bpp supported
+      throw new Error('Only 32 bpp supported')
+    }
+  }
 }
 
-export class IconImage {
+class IcoImage {
   constructor({
     header = new BitmapInfoHeader(),
-    colors = [],
-    xor = [],
-    and = []
+    xor = null,
+    and = null
   } = {}) {
     this.header = header
-    this.colors = colors
     this.xor = xor
     this.and = and
   }
-}
+  get data() {
+    const list = [this.header.data, this.xor, this.and]
+    const totalLength = list.reduce((carry, buf) => carry + buf.length, 0)
+    return Buffer.concat(list, totalLength)
+  }
+  set data(buffer) {
+    this.header.data = buffer
 
-// eslint-disable-next-line no-unused-vars
-export class RGBQuad {
-  constructor({ blue = 0, green = 0, red = 0, reserved = 0 } = {}) {
-    this.blue = blue
-    this.green = green
-    this.red = red
-    this.reserved = reserved
+    // TODO: only 32 bpp supported
+    // no colors when bpp is 16 or more
+
+    let pos = this.header.data.length
+    const xorSize =
+      (((this.header.width * this.header.height) / 2) * this.header.bitCount) /
+      8
+    this.xor = buffer.slice(pos, pos + xorSize)
+
+    pos += xorSize
+    const andSize =
+      ((this.header.width +
+        (this.header.width % 32 ? 32 - (this.header.width % 32) : 0)) *
+        this.header.height) /
+      2 /
+      8
+    this.and = buffer.slice(pos, pos + andSize)
+  }
+  static create(bitmap) {
+    const width = bitmap.width
+    const height = bitmap.height * 2 // image + mask
+    const planes = 1
+    const bitCount = bitmap.bpp * 8 // byte per pixel * 8
+
+    const xorSize = bitmap.height * bitmap.width * bitmap.bpp
+    const andSize =
+      ((bitmap.width + (bitmap.width % 32 ? 32 - (bitmap.width % 32) : 0)) *
+        bitmap.height) /
+      8
+    const sizeImage = xorSize + andSize
+
+    const header = new BitmapInfoHeader({
+      width,
+      height,
+      planes,
+      bitCount,
+      sizeImage
+    })
+
+    const xors = []
+    let andBits = []
+
+    // Convert Top/Left to Bottom/Left
+    for (let y = bitmap.height - 1; y >= 0; y--) {
+      for (let x = 0; x < bitmap.width; x++) {
+        // RGBA to BGRA
+        const pos = (y * bitmap.width + x) * bitmap.bpp
+        const red = bitmap.data.slice(pos, pos + 1)
+        const green = bitmap.data.slice(pos + 1, pos + 2)
+        const blue = bitmap.data.slice(pos + 2, pos + 3)
+        const alpha = bitmap.data.slice(pos + 3, pos + 4)
+        xors.push(blue)
+        xors.push(green)
+        xors.push(red)
+        xors.push(alpha)
+        andBits.push(alpha.readUInt8() === 0 ? 1 : 0)
+      }
+      const padding = andBits.length % 32 ? 32 - (andBits.length % 32) : 0
+      andBits = andBits.concat(Array(padding).fill(0))
+    }
+
+    const ands = []
+    for (let i = 0; i < andBits.length; i += 8) {
+      const n = parseInt(andBits.slice(i, i + 8).join(''), 2)
+      const buf = Buffer.alloc(1)
+      buf.writeUInt8(n)
+      ands.push(buf)
+    }
+
+    const xor = Buffer.concat(xors, xorSize)
+    const and = Buffer.concat(ands, andSize)
+
+    return new IcoImage({ header, xor, and })
   }
 }
 
-export class BitmapInfoHeader {
+class BitmapInfoHeader {
   constructor({
-    size = bitmapInfoHeaderSize,
+    size = 40,
     width = 0,
     height = 0,
     planes = 0,
@@ -86,12 +189,41 @@ export class BitmapInfoHeader {
     this.clrUsed = clrUsed
     this.clrImportant = clrImportant
   }
+  get data() {
+    const buffer = Buffer.alloc(40)
+    buffer.writeUInt32LE(this.size, 0)
+    buffer.writeInt32LE(this.width, 4)
+    buffer.writeInt32LE(this.height, 8)
+    buffer.writeUInt16LE(this.planes, 12)
+    buffer.writeUInt16LE(this.bitCount, 14)
+    buffer.writeUInt32LE(this.compression, 16)
+    buffer.writeUInt32LE(this.sizeImage, 20)
+    buffer.writeInt32LE(this.xPelsPerMeter, 24)
+    buffer.writeInt32LE(this.yPelsPerMeter, 28)
+    buffer.writeUInt32LE(this.clrUsed, 32)
+    buffer.writeUInt32LE(this.clrImportant, 36)
+    return buffer
+  }
+  set data(buffer) {
+    this.size = buffer.readUInt32LE(0)
+    this.width = buffer.readInt32LE(4)
+    this.height = buffer.readInt32LE(8)
+    this.planes = buffer.readUInt16LE(12)
+    this.bitCount = buffer.readUInt16LE(14)
+    this.compression = buffer.readUInt32LE(16)
+    this.sizeImage = buffer.readUInt32LE(20)
+    this.xPelsPerMeter = buffer.readInt32LE(24)
+    this.yPelsPerMeter = buffer.readInt32LE(28)
+    this.clrUsed = buffer.readUInt32LE(32)
+    this.clrImportant = buffer.readUInt32LE(36)
+  }
 }
 
 export default class Ico {
   constructor(buffer) {
-    this.iconDir = new IconDir()
-    this.iconImages = []
+    this.fileHeader = new IcoFileHeader()
+    this.infoHeaders = []
+    this.images = []
     if (buffer) {
       this.data = buffer
     }
@@ -99,221 +231,92 @@ export default class Ico {
   static get supportedSizes() {
     return [16, 24, 32, 48, 64, 128, 256]
   }
-  get _iconDirData() {
-    const iconDir = Buffer.alloc(iconDirSize)
-    iconDir.writeUInt16LE(this.iconDir.reserved, 0)
-    iconDir.writeUInt16LE(this.iconDir.type, 2)
-    iconDir.writeUInt16LE(this.iconDir.count, 4)
-
-    const entries = this.iconDir.entries.map((entry) => {
-      const buf = Buffer.alloc(iconDirEntrySize)
-      buf.writeUInt8(entry.width, 0)
-      buf.writeUInt8(entry.height, 1)
-      buf.writeUInt8(entry.colorCount, 2)
-      buf.writeUInt8(entry.reserved, 3)
-      buf.writeUInt16LE(entry.planes, 4)
-      buf.writeUInt16LE(entry.bitCount, 6)
-      buf.writeUInt32LE(entry.bytesInRes, 8)
-      buf.writeUInt32LE(entry.imageOffset, 12)
-      return buf
-    })
-
-    const list = [iconDir, ...entries]
-    const totalLength = list.reduce((carry, buf) => carry + buf.length, 0)
-
-    return Buffer.concat(list, totalLength)
-  }
-  set _iconDirData(buffer) {
-    let pos = 0
-    const iconDir = new IconDir()
-    iconDir.reserved = buffer.readUInt16LE(pos)
-    iconDir.type = buffer.readUInt16LE(pos + 2)
-    iconDir.count = buffer.readUInt16LE(pos + 4)
-    pos += iconDirSize
-    for (let i = 0; i < iconDir.count; i++) {
-      const entry = new IconDirEntry()
-      entry.width = buffer.readUInt8(pos)
-      entry.height = buffer.readUInt8(pos + 1)
-      entry.colorCount = buffer.readUInt8(pos + 2)
-      entry.reserved = buffer.readUInt8(pos + 3)
-      entry.planes = buffer.readUInt16LE(pos + 4)
-      entry.bitCount = buffer.readUInt16LE(pos + 6)
-      entry.bytesInRes = buffer.readUInt32LE(pos + 8)
-      entry.imageOffset = buffer.readUInt32LE(pos + 12)
-      iconDir.entries.push(entry)
-      pos += iconDirEntrySize
-    }
-    this.iconDir = iconDir
-  }
-  get _iconImagesData() {
-    return this.iconImages.map((image) => {
-      // PNG format
-      if (Buffer.isBuffer(image)) {
-        return image
-      }
-
-      const header = Buffer.alloc(bitmapInfoHeaderSize)
-      header.writeUInt32LE(image.header.size, 0)
-      header.writeInt32LE(image.header.width, 4)
-      header.writeInt32LE(image.header.height, 8)
-      header.writeUInt16LE(image.header.planes, 12)
-      header.writeUInt16LE(image.header.bitCount, 14)
-      header.writeUInt32LE(image.header.compression, 16)
-      header.writeUInt32LE(image.header.sizeImage, 20)
-      header.writeInt32LE(image.header.xPelsPerMeter, 24)
-      header.writeInt32LE(image.header.yPelsPerMeter, 28)
-      header.writeUInt32LE(image.header.clrUsed, 32)
-      header.writeUInt32LE(image.header.clrImportant, 36)
-
-      const colors = image.colors.map((color) => {
-        const buf = Buffer.alloc(4)
-        buf.writeUInt8(color.blue, 0)
-        buf.writeUInt8(color.green, 1)
-        buf.writeUInt8(color.red, 2)
-        buf.writeUInt8(color.reserved, 3)
-        return buf
-      })
-
-      const images = image.xor.map((image) => {
-        const buf = Buffer.alloc(1)
-        buf.writeUInt8(image, 0)
-        return buf
-      })
-
-      const masks = image.and.map((image) => {
-        const buf = Buffer.alloc(1)
-        buf.writeUInt8(image, 0)
-        return buf
-      })
-
-      const list = [header, ...colors, ...images, ...masks]
-      const totalLength = list.reduce((carry, buf) => carry + buf.length, 0)
-
-      return Buffer.concat(list, totalLength)
-    })
-  }
-  set _iconImagesData(buffer) {
-    const iconImages = []
-    for (let i = 0; i < this.iconDir.count; i++) {
-      let { imageOffset: pos, bytesInRes: size } = this.iconDir.entries[i]
-
-      const data = buffer.slice(pos, pos + size)
-      const type = fileType(data) || {}
-      // PNG format
-      if (type.mime === 'image/png') {
-        iconImages.push(data)
-        continue
-      }
-
-      const image = new IconImage()
-      image.header.size = buffer.readUInt32LE(pos)
-      image.header.width = buffer.readInt32LE(pos + 4)
-      image.header.height = buffer.readInt32LE(pos + 8)
-      image.header.planes = buffer.readUInt16LE(pos + 12)
-      image.header.bitCount = buffer.readUInt16LE(pos + 14)
-      image.header.compression = buffer.readUInt32LE(pos + 16)
-      image.header.sizeImage = buffer.readUInt32LE(pos + 20)
-      image.header.xPelsPerMeter = buffer.readInt32LE(pos + 24)
-      image.header.yPelsPerMeter = buffer.readInt32LE(pos + 28)
-      image.header.clrUsed = buffer.readUInt32LE(pos + 32)
-      image.header.clrImportant = buffer.readUInt32LE(pos + 36)
-
-      pos += bitmapInfoHeaderSize
-      size -= bitmapInfoHeaderSize
-
-      // TODO: 1,2,4,8 bpp
-      // no colors when bpp is 16 or more
-      for (let i = 0; i < size; i++) {
-        const xor = buffer.readUInt8(pos++)
-        image.xor.push(xor)
-      }
-
-      iconImages.push(image)
-    }
-    this.iconImages = iconImages
-  }
   get data() {
-    const list = [this._iconDirData, ...this._iconImagesData]
+    const list = [
+      this.fileHeader.data,
+      ...this.infoHeaders.map((infoHeader) => infoHeader.data),
+      ...this.images.map((image) => image.data)
+    ]
     const totalLength = list.reduce((carry, buf) => carry + buf.length, 0)
     return Buffer.concat(list, totalLength)
   }
   set data(buffer) {
-    this._iconDirData = buffer
-    this._iconImagesData = buffer
+    this.fileHeader.data = buffer
+
+    let pos = this.fileHeader.data.length
+    const infoHeaders = []
+    for (let i = 0; i < this.fileHeader.count; i++) {
+      const infoHeader = new IcoInfoHeader()
+      infoHeader.data = buffer.slice(pos)
+      infoHeaders.push(infoHeader)
+      pos += infoHeader.data.length
+    }
+    this.infoHeaders = infoHeaders
+
+    const images = []
+    for (let i = 0; i < this.infoHeaders.length; i++) {
+      const { imageOffset: pos } = this.infoHeaders[i]
+      const image = new IcoImage()
+      image.data = buffer.slice(pos)
+      images.push(image)
+    }
+    this.images = images
   }
-  _resetIconDir() {
-    this.iconDir.count = this.iconDir.entries.length
+  _resetHeader() {
+    this.fileHeader.count = this.infoHeaders.length
 
     let imageOffset =
-      iconDirSize + iconDirEntrySize * this.iconDir.entries.length
-    this.iconDir.entries = this.iconDir.entries.map((entry) => {
-      entry.imageOffset = imageOffset
-      imageOffset += entry.bytesInRes
-      return entry
+      this.fileHeader.data.length +
+      this.infoHeaders.reduce(
+        (carry, infoHeader) => carry + infoHeader.data.length,
+        0
+      )
+    this.infoHeaders = this.infoHeaders.map((infoHeader) => {
+      infoHeader.imageOffset = imageOffset
+      imageOffset += infoHeader.bytesInRes
+      return infoHeader
     })
   }
-  _createIconImage(bitmap) {
-    const width = bitmap.width
-    const height = bitmap.height * 2 // image + mask
-    const planes = 1
-    const bitCount = bitmap.bpp * 8
-    const header = new BitmapInfoHeader({ width, height, planes, bitCount })
-
-    const xor = []
-    // Convert Top/Left to Bottom/Left
-    for (let y = bitmap.height - 1; y >= 0; y--) {
-      for (let x = 0; x < bitmap.width; x++) {
-        // RGBA to BGRA
-        const pos = (y * bitmap.width + x) * bitmap.bpp
-        const red = bitmap.data.readUInt8(pos)
-        const green = bitmap.data.readUInt8(pos + 1)
-        const blue = bitmap.data.readUInt8(pos + 2)
-        const alpha = bitmap.data.readUInt8(pos + 3)
-        xor.push(blue)
-        xor.push(green)
-        xor.push(red)
-        xor.push(alpha)
-      }
-    }
-
-    return new IconImage({ header, xor })
+  async appendImage(buffer) {
+    await this.insertImage(buffer, this.fileHeader.count)
   }
-  async appendImage(buffer, options) {
-    await this.insertImage(buffer, this.iconDir.count, options)
-  }
-  async insertImage(buffer, index, { bitmap: useBitmap } = { bitmap: false }) {
+  async insertImage(buffer, index) {
     const image = await Jimp.read(buffer)
     if (image.getMIME() !== Jimp.MIME_PNG) {
       throw new TypeError('Image must be png format')
     }
+    if (image.getWidth() !== image.getHeight()) {
+      throw new TypeError('Image must be squre')
+    }
+    const size = image.getWidth()
+    if (!Ico.supportedSizes.includes(size)) {
+      throw new TypeError('No supported Size')
+    }
 
-    const bitmap = image.bitmap
-    const width = bitmap.width > 255 ? 0 : bitmap.width
-    const height = bitmap.height > 255 ? 0 : bitmap.height
-    const planes = 1
-    const bitCount = bitmap.bpp * 8
-    const bytesInRes = useBitmap
-      ? bitmapInfoHeaderSize + bitmap.data.length
-      : buffer.length
+    const icoImage = IcoImage.create(image.bitmap)
 
-    const entry = new IconDirEntry({
+    const width = size < 256 ? size : 0
+    const height = size < 256 ? size : 0
+    const planes = icoImage.header.planes
+    const bitCount = icoImage.header.bitCount
+    const bytesInRes = icoImage.data.length
+    const infoHeader = new IcoInfoHeader({
       width,
       height,
       planes,
       bitCount,
       bytesInRes
     })
-    const iconImage = useBitmap ? this._createIconImage(bitmap) : buffer
 
-    this.iconDir.entries[index] = entry
-    this.iconImages[index] = iconImage
+    this.infoHeaders[index] = infoHeader
+    this.images[index] = icoImage
 
-    this._resetIconDir()
+    this._resetHeader()
   }
   removeImage(index) {
-    this.iconDir.entries.splice(index, 1)
-    this.iconImages.splice(index, 1)
+    this.infoHeaders.splice(index, 1)
+    this.images.splice(index, 1)
 
-    this._resetIconDir()
+    this._resetHeader()
   }
 }
