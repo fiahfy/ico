@@ -81,7 +81,7 @@ class IcoImage {
   }
   get data() {
     const list = [this.header.data, this.xor, this.and]
-    const totalLength = list.reduce((carry, buf) => carry + buf.length, 0)
+    const totalLength = list.reduce((carry, buffer) => carry + buffer.length, 0)
     return Buffer.concat(list, totalLength)
   }
   set data(buffer) {
@@ -151,9 +151,9 @@ class IcoImage {
     const ands = []
     for (let i = 0; i < andBits.length; i += 8) {
       const n = parseInt(andBits.slice(i, i + 8).join(''), 2)
-      const buf = Buffer.alloc(1)
-      buf.writeUInt8(n)
-      ands.push(buf)
+      const buffer = Buffer.alloc(1)
+      buffer.writeUInt8(n)
+      ands.push(buffer)
     }
 
     const xor = Buffer.concat(xors, xorSize)
@@ -237,7 +237,7 @@ export default class Ico {
       ...this.infoHeaders.map((infoHeader) => infoHeader.data),
       ...this.images.map((image) => image.data)
     ]
-    const totalLength = list.reduce((carry, buf) => carry + buf.length, 0)
+    const totalLength = list.reduce((carry, buffer) => carry + buffer.length, 0)
     return Buffer.concat(list, totalLength)
   }
   set data(buffer) {
