@@ -1,6 +1,6 @@
 # ico
 
-![badge](https://github.com/fiahfy/icon/workflows/Node.js%20Package/badge.svg)
+![badge](https://github.com/fiahfy/ico/workflows/Node.js%20Package/badge.svg)
 
 > [ICO file format](<https://en.wikipedia.org/wiki/ICO_(file_format)>) parser and builder.
 
