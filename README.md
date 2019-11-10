@@ -1,17 +1,19 @@
-# @fiahfy/ico
+# ico
 
-> [ICO file format](https://en.wikipedia.org/wiki/ICO_(file_format)) parser and builder.
+![badge](https://github.com/fiahfy/icon/workflows/Node.js%20Package/badge.svg)
 
+> [ICO file format](<https://en.wikipedia.org/wiki/ICO_(file_format)>) parser and builder.
 
 ## Installation
-```
+
+```bash
 npm install @fiahfy/ico
 ```
-
 
 ## Usage
 
 ### Parsing
+
 ```js
 import fs from 'fs'
 import Ico from '@fiahfy/ico'
@@ -23,6 +25,7 @@ console.log(ico.infoHeaders[0]) // IcoInfoHeader { width: 16, height: 16, ... }
 ```
 
 ### Building
+
 ```js
 import fs from 'fs'
 import Ico from '@fiahfy/ico'
@@ -41,12 +44,12 @@ await ico.appendImage(buf)
 fs.writeFileSync('icon.ico', ico.data)
 ```
 
-
 ## Specifications
 
 ### Supported Size
+
 | Size    |
-|---------|
+| ------- |
 | 16x16   |
 | 24x24   |
 | 32x32   |
