@@ -1,5 +1,5 @@
 export class BitmapInfoHeader {
-  readonly size: number
+  readonly size: 40
   readonly width: number
   readonly height: number
   readonly planes: number
@@ -12,7 +12,7 @@ export class BitmapInfoHeader {
   readonly clrImportant: number
 
   constructor(
-    size = 40,
+    size: 40 = 40,
     width = 0,
     height = 0,
     planes = 0,
@@ -42,7 +42,7 @@ export class BitmapInfoHeader {
    * @param buffer The bitmap info header.
    */
   static from(buffer: Buffer): BitmapInfoHeader {
-    const size = buffer.readUInt32LE(0)
+    const size = buffer.readUInt32LE(0) as 40
     const width = buffer.readInt32LE(4)
     const height = buffer.readInt32LE(8)
     const planes = buffer.readUInt16LE(12)

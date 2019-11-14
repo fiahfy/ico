@@ -1,8 +1,6 @@
-import Jimp from 'jimp'
 import { IcoFileHeader } from './ico-file-header'
 import { IcoInfoHeader } from './ico-info-header'
 import { IcoImage } from './ico-image'
-import { file } from '@babel/types'
 
 export class Ico {
   static readonly supportedIconSizes = [16, 24, 32, 48, 64, 128, 256]
@@ -54,18 +52,6 @@ export class Ico {
     return this._infoHeaders
   }
 
-  set infoHeaders(infoHeaders: ReadonlyArray<IcoInfoHeader>) {
-    this._infoHeaders = infoHeaders
-
-    const count = this._infoHeaders.length
-
-    this._fileHeader = new IcoFileHeader(
-      this._fileHeader.reserved,
-      this._fileHeader.type,
-      count
-    )
-  }
-
   get images(): ReadonlyArray<IcoImage> {
     return this._images
   }
@@ -73,17 +59,44 @@ export class Ico {
   set images(images: ReadonlyArray<IcoImage>) {
     this._images = images
 
+    this._fileHeader = new IcoFileHeader(
+      this._fileHeader.reserved,
+      this._fileHeader.type,
+      this._images.length
+    )
+
+    const infoHeaders = this._images.map((image) => {
+      return new IcoInfoHeader(
+        image.header.width < 256 ? image.header.width : 0,
+        image.header.height < 256 ? image.header.height : 0,
+        0,
+        0,
+        image.header.planes,
+        image.header.bitCount,
+        image.data.length
+      )
+    })
+
     let imageOffset =
       this._fileHeader.data.length +
-      this._infoHeaders.reduce(
+      infoHeaders.reduce(
         (carry, infoHeader) => carry + infoHeader.data.length,
         0
       )
 
-    const infoHeaders = this._infoHeaders.map((infoHeader) => {
-      infoHeader.imageOffset = imageOffset
-      imageOffset += infoHeader.bytesInRes
-      return infoHeader
+    this._infoHeaders = infoHeaders.map((infoHeader) => {
+      const header = new IcoInfoHeader(
+        infoHeader.width,
+        infoHeader.height,
+        infoHeader.colorCount,
+        infoHeader.reserved,
+        infoHeader.planes,
+        infoHeader.bitCount,
+        infoHeader.bytesInRes,
+        imageOffset
+      )
+      imageOffset += header.bytesInRes
+      return header
     })
   }
 
@@ -96,48 +109,35 @@ export class Ico {
     return Buffer.concat(buffers)
   }
 
-  async appendImage(buffer: Buffer): Promise<void> {
-    await this.insertImage(buffer, this.fileHeader.count)
+  /**
+   * Adds ICO image at the end.
+   * @param image The ICO Image to append.
+   */
+  append(image: IcoImage): void {
+    this.images = [...this.images, image]
   }
-  async insertImage(buffer: Buffer, index: number): Promise<void> {
-    const image = await Jimp.read(buffer)
-    if (image.getMIME() !== Jimp.MIME_PNG) {
-      throw new TypeError('Image must be png format')
-    }
-    if (image.getWidth() !== image.getHeight()) {
-      throw new TypeError('Image must be squre')
-    }
-    const size = image.getWidth()
-    if (!Ico.supportedSizes.includes(size)) {
-      throw new TypeError('No supported Size')
-    }
 
-    const icoImage = IcoImage.create(image.bitmap)
-
-    const width = size < 256 ? size : 0
-    const height = size < 256 ? size : 0
-    const planes = icoImage.header.planes
-    const bitCount = icoImage.header.bitCount
-    const bytesInRes = icoImage.data.length
-    const infoHeader = new IcoInfoHeader(
-      width,
-      height,
-      0,
-      0,
-      planes,
-      bitCount,
-      bytesInRes
-    )
-
-    this.infoHeaders[index] = infoHeader
-    this.images[index] = icoImage
-
-    this.resetHeader()
+  /**
+   * Inserts ICO image at the specified position.
+   * @param image The ICO Image to insert.
+   * @param index The position at which to insert the ICO Image.
+   */
+  insert(image: IcoImage, index: number): void {
+    this.images = [
+      ...this.images.slice(0, index),
+      image,
+      ...this.images.slice(index + 1)
+    ]
   }
-  removeImage(index: number): void {
-    this.infoHeaders.splice(index, 1)
-    this.images.splice(index, 1)
 
-    this.resetHeader()
+  /**
+   * Removes ICO image at the specified position.
+   * @param index The position of the ICO Image to remove.
+   */
+  remove(index: number): void {
+    this.images = [
+      ...this.images.slice(0, index),
+      ...this.images.slice(index + 1)
+    ]
   }
 }

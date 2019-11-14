@@ -1,5 +1,6 @@
-import { Bitmap } from 'jimp'
+import { PNG } from 'pngjs'
 import { BitmapInfoHeader } from './bitmap-info-header'
+import { Ico } from './ico'
 
 export class IcoImage {
   readonly header: BitmapInfoHeader
@@ -41,41 +42,42 @@ export class IcoImage {
     return new IcoImage(header, xor, and)
   }
 
-  static create(bitmap: Bitmap): IcoImage {
-    const width = bitmap.width
-    const height = bitmap.height * 2 // image + mask
+  /**
+   * Create ICO Image from the PNG image buffer.
+   * @param buffer The PNG image buffer.
+   */
+  static fromPNG(buffer: Buffer): IcoImage {
+    const png = IcoImage.readPNG(buffer)
+    if (!png) {
+      throw new TypeError('Image must be PNG format')
+    }
+
+    const width = png.width
+    let height = png.height
+    if (width !== height) {
+      throw new TypeError('Image must be squre')
+    }
+    const supported = Ico.supportedIconSizes.includes(width)
+    if (!supported) {
+      throw new TypeError('No supported size')
+    }
+
+    height *= 2 // image + mask
     const planes = 1
-    const bitCount = (bitmap as any).bpp * 8 // byte per pixel * 8
-
-    const xorSize = bitmap.height * bitmap.width * (bitmap as any).bpp
-    const andSize =
-      ((bitmap.width + (bitmap.width % 32 ? 32 - (bitmap.width % 32) : 0)) *
-        bitmap.height) /
-      8
-    const sizeImage = xorSize + andSize
-
-    const header = new BitmapInfoHeader(
-      40,
-      width,
-      height,
-      planes,
-      bitCount,
-      0,
-      sizeImage
-    )
+    const bitCount = (png as any).bpp * 8 // byte per pixel * 8
 
     const xors = []
     let andBits: number[] = []
 
     // Convert Top/Left to Bottom/Left
-    for (let y = bitmap.height - 1; y >= 0; y--) {
-      for (let x = 0; x < bitmap.width; x++) {
+    for (let y = height - 1; y >= 0; y--) {
+      for (let x = 0; x < width; x++) {
         // RGBA to BGRA
-        const pos = (y * bitmap.width + x) * (bitmap as any).bpp
-        const red = bitmap.data.slice(pos, pos + 1)
-        const green = bitmap.data.slice(pos + 1, pos + 2)
-        const blue = bitmap.data.slice(pos + 2, pos + 3)
-        const alpha = bitmap.data.slice(pos + 3, pos + 4)
+        const pos = (y * width + x) * (png as any).bpp
+        const red = png.data.slice(pos, pos + 1)
+        const green = png.data.slice(pos + 1, pos + 2)
+        const blue = png.data.slice(pos + 2, pos + 3)
+        const alpha = png.data.slice(pos + 3, pos + 4)
         xors.push(blue)
         xors.push(green)
         xors.push(red)
@@ -95,8 +97,18 @@ export class IcoImage {
       ands.push(buffer)
     }
 
-    const xor = Buffer.concat(xors, xorSize)
-    const and = Buffer.concat(ands, andSize)
+    const xor = Buffer.concat(xors)
+    const and = Buffer.concat(ands)
+
+    const header = new BitmapInfoHeader(
+      40,
+      width,
+      height,
+      planes,
+      bitCount,
+      0,
+      xor.length + and.length
+    )
 
     return new IcoImage(header, xor, and)
   }
@@ -104,5 +116,13 @@ export class IcoImage {
   get data(): Buffer {
     const buffers = [this.header.data, this.xor, this.and]
     return Buffer.concat(buffers)
+  }
+
+  private static readPNG(buffer: Buffer): PNG | undefined {
+    try {
+      return PNG.sync.read(buffer)
+    } catch (e) {
+      return undefined
+    }
   }
 }

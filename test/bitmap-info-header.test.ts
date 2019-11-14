@@ -1,0 +1,50 @@
+import { BitmapInfoHeader } from '../src'
+
+describe('BitmapInfoHeader', () => {
+  describe('constructor', () => {
+    test('should work', () => {
+      const header = new BitmapInfoHeader()
+      expect(header.size).toBe(40)
+      expect(header.width).toBe(0)
+      expect(header.height).toBe(0)
+      expect(header.planes).toBe(0)
+      expect(header.bitCount).toBe(0)
+      expect(header.compression).toBe(0)
+      expect(header.sizeImage).toBe(0)
+      expect(header.xPelsPerMeter).toBe(0)
+      expect(header.yPelsPerMeter).toBe(0)
+      expect(header.clrUsed).toBe(0)
+      expect(header.clrImportant).toBe(0)
+    })
+  })
+
+  describe('from', () => {
+    test('should work', () => {
+      const buffer = Buffer.alloc(40)
+      buffer.writeUInt32LE(40, 0)
+      buffer.writeInt32LE(32, 4)
+      buffer.writeInt32LE(32, 8)
+      buffer.writeUInt16LE(4, 12)
+      buffer.writeUInt16LE(32, 14)
+      buffer.writeUInt32LE(1, 16)
+      buffer.writeUInt32LE(512, 20)
+      buffer.writeInt32LE(1, 24)
+      buffer.writeInt32LE(1, 28)
+      buffer.writeUInt32LE(1, 32)
+      buffer.writeUInt32LE(1, 36)
+
+      const header = BitmapInfoHeader.from(buffer)
+      expect(header.size).toBe(40)
+      expect(header.width).toBe(32)
+      expect(header.height).toBe(32)
+      expect(header.planes).toBe(4)
+      expect(header.bitCount).toBe(32)
+      expect(header.compression).toBe(1)
+      expect(header.sizeImage).toBe(512)
+      expect(header.xPelsPerMeter).toBe(1)
+      expect(header.yPelsPerMeter).toBe(1)
+      expect(header.clrUsed).toBe(1)
+      expect(header.clrImportant).toBe(1)
+    })
+  })
+})
