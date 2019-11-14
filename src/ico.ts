@@ -2,69 +2,98 @@ import Jimp from 'jimp'
 import { IcoFileHeader } from './ico-file-header'
 import { IcoInfoHeader } from './ico-info-header'
 import { IcoImage } from './ico-image'
+import { file } from '@babel/types'
 
 export class Ico {
-  static readonly supportedSizes = [16, 24, 32, 48, 64, 128, 256]
+  static readonly supportedIconSizes = [16, 24, 32, 48, 64, 128, 256]
 
-  fileHeader: IcoFileHeader
-  infoHeaders: IcoInfoHeader[]
-  images: IcoImage[]
+  private _fileHeader: IcoFileHeader
+  private _infoHeaders: ReadonlyArray<IcoInfoHeader>
+  private _images: ReadonlyArray<IcoImage>
 
-  constructor(buffer?: Buffer) {
-    this.fileHeader = new IcoFileHeader()
-    this.infoHeaders = []
-    this.images = []
-    if (buffer) {
-      this.data = buffer
-    }
+  constructor(
+    fileHeader = new IcoFileHeader(),
+    infoHeaders: IcoInfoHeader[] = [],
+    images: IcoImage[] = []
+  ) {
+    this._fileHeader = fileHeader
+    this._infoHeaders = infoHeaders
+    this._images = images
   }
 
-  get data(): Buffer {
-    const buffers = [
-      this.fileHeader.data,
-      ...this.infoHeaders.map((infoHeader) => infoHeader.data),
-      ...this.images.map((image) => image.data)
-    ]
-    return Buffer.concat(buffers)
-  }
+  /**
+   * Create ICO from the icon buffer.
+   * @param buffer The ICO icon buffer.
+   */
+  static from(buffer: Buffer): Ico {
+    const fileHeader = IcoFileHeader.from(buffer)
 
-  set data(buffer) {
-    this.fileHeader.data = buffer
-
-    let pos = this.fileHeader.data.length
+    let pos = fileHeader.data.length
     const infoHeaders = []
-    for (let i = 0; i < this.fileHeader.count; i++) {
-      const infoHeader = new IcoInfoHeader()
-      infoHeader.data = buffer.slice(pos)
+    for (let i = 0; i < fileHeader.count; i++) {
+      const infoHeader = IcoInfoHeader.from(buffer.slice(pos))
       infoHeaders.push(infoHeader)
       pos += infoHeader.data.length
     }
-    this.infoHeaders = infoHeaders
 
     const images = []
-    for (let i = 0; i < this.infoHeaders.length; i++) {
-      const { imageOffset: pos } = this.infoHeaders[i]
-      const image = new IcoImage()
-      image.data = buffer.slice(pos)
+    for (let i = 0; i < infoHeaders.length; i++) {
+      const { imageOffset: pos } = infoHeaders[i]
+      const image = IcoImage.from(buffer.slice(pos))
       images.push(image)
     }
-    this.images = images
+
+    return new Ico(fileHeader, infoHeaders, images)
   }
 
-  private resetHeader(): void {
-    this.fileHeader.count = this.infoHeaders.length
+  get fileHeader(): IcoFileHeader {
+    return this._fileHeader
+  }
+
+  get infoHeaders(): ReadonlyArray<IcoInfoHeader> {
+    return this._infoHeaders
+  }
+
+  set infoHeaders(infoHeaders: ReadonlyArray<IcoInfoHeader>) {
+    this._infoHeaders = infoHeaders
+
+    const count = this._infoHeaders.length
+
+    this._fileHeader = new IcoFileHeader(
+      this._fileHeader.reserved,
+      this._fileHeader.type,
+      count
+    )
+  }
+
+  get images(): ReadonlyArray<IcoImage> {
+    return this._images
+  }
+
+  set images(images: ReadonlyArray<IcoImage>) {
+    this._images = images
 
     let imageOffset =
-      this.fileHeader.data.length +
-      this.infoHeaders.reduce(
+      this._fileHeader.data.length +
+      this._infoHeaders.reduce(
         (carry, infoHeader) => carry + infoHeader.data.length,
         0
       )
-    this.infoHeaders = this.infoHeaders.map((infoHeader) => {
+
+    const infoHeaders = this._infoHeaders.map((infoHeader) => {
       infoHeader.imageOffset = imageOffset
       imageOffset += infoHeader.bytesInRes
       return infoHeader
     })
+  }
+
+  get data(): Buffer {
+    const buffers = [
+      this._fileHeader.data,
+      ...this._infoHeaders.map((infoHeader) => infoHeader.data),
+      ...this._images.map((image) => image.data)
+    ]
+    return Buffer.concat(buffers)
   }
 
   async appendImage(buffer: Buffer): Promise<void> {

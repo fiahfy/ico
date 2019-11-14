@@ -2,9 +2,10 @@ import { Bitmap } from 'jimp'
 import { BitmapInfoHeader } from './bitmap-info-header'
 
 export class IcoImage {
-  header: BitmapInfoHeader
-  xor: Buffer
-  and: Buffer
+  readonly header: BitmapInfoHeader
+  readonly xor: Buffer
+  readonly and: Buffer
+
   constructor(
     header = new BitmapInfoHeader(),
     xor = Buffer.alloc(0),
@@ -14,32 +15,32 @@ export class IcoImage {
     this.xor = xor
     this.and = and
   }
-  get data(): Buffer {
-    const list = [this.header.data, this.xor, this.and]
-    const totalLength = list.reduce((carry, buffer) => carry + buffer.length, 0)
-    return Buffer.concat(list, totalLength)
-  }
-  set data(buffer) {
-    this.header.data = buffer
+
+  /**
+   * Create ICO image from the buffer.
+   * @param buffer The ICO image buffer.
+   */
+  static from(buffer: Buffer): IcoImage {
+    const header = BitmapInfoHeader.from(buffer)
 
     // TODO: only 32 bpp supported
     // no colors when bpp is 16 or more
 
-    let pos = this.header.data.length
-    const xorSize =
-      (((this.header.width * this.header.height) / 2) * this.header.bitCount) /
-      8
-    this.xor = buffer.slice(pos, pos + xorSize)
+    let pos = header.data.length
+    const xorSize = (((header.width * header.height) / 2) * header.bitCount) / 8
+    const xor = buffer.slice(pos, pos + xorSize)
 
     pos += xorSize
     const andSize =
-      ((this.header.width +
-        (this.header.width % 32 ? 32 - (this.header.width % 32) : 0)) *
-        this.header.height) /
+      ((header.width + (header.width % 32 ? 32 - (header.width % 32) : 0)) *
+        header.height) /
       2 /
       8
-    this.and = buffer.slice(pos, pos + andSize)
+    const and = buffer.slice(pos, pos + andSize)
+
+    return new IcoImage(header, xor, and)
   }
+
   static create(bitmap: Bitmap): IcoImage {
     const width = bitmap.width
     const height = bitmap.height * 2 // image + mask
@@ -98,5 +99,10 @@ export class IcoImage {
     const and = Buffer.concat(ands, andSize)
 
     return new IcoImage(header, xor, and)
+  }
+
+  get data(): Buffer {
+    const buffers = [this.header.data, this.xor, this.and]
+    return Buffer.concat(buffers)
   }
 }

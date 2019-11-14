@@ -1,12 +1,12 @@
 export class IcoInfoHeader {
-  width: number
-  height: number
-  colorCount: number
-  reserved: number
-  planes: number
-  bitCount: number
-  bytesInRes: number
-  imageOffset: number
+  readonly width: number
+  readonly height: number
+  readonly colorCount: number
+  readonly reserved: number
+  readonly planes: number
+  readonly bitCount: number
+  readonly bytesInRes: number
+  readonly imageOffset: number
 
   constructor(
     width = 0,
@@ -28,6 +28,35 @@ export class IcoInfoHeader {
     this.imageOffset = imageOffset
   }
 
+  /**
+   * Create ICO info header from the buffer.
+   * @param buffer The ICO info header image buffer.
+   */
+  static from(buffer: Buffer): IcoInfoHeader {
+    const width = buffer.readUInt8(0)
+    const height = buffer.readUInt8(1)
+    const colorCount = buffer.readUInt8(2)
+    const reserved = buffer.readUInt8(3)
+    const planes = buffer.readUInt16LE(4)
+    const bitCount = buffer.readUInt16LE(6)
+    const bytesInRes = buffer.readUInt32LE(8)
+    const imageOffset = buffer.readUInt32LE(12)
+    if (bitCount !== 32) {
+      // TODO: only 32 bpp supported
+      throw new Error('Only 32 bpp supported')
+    }
+    return new IcoInfoHeader(
+      width,
+      height,
+      colorCount,
+      reserved,
+      planes,
+      bitCount,
+      bytesInRes,
+      imageOffset
+    )
+  }
+
   get data(): Buffer {
     const buffer = Buffer.alloc(16)
     buffer.writeUInt8(this.width, 0)
@@ -39,21 +68,5 @@ export class IcoInfoHeader {
     buffer.writeUInt32LE(this.bytesInRes, 8)
     buffer.writeUInt32LE(this.imageOffset, 12)
     return buffer
-  }
-
-  set data(buffer) {
-    this.width = buffer.readUInt8(0)
-    this.height = buffer.readUInt8(1)
-    this.colorCount = buffer.readUInt8(2)
-    this.reserved = buffer.readUInt8(3)
-    this.planes = buffer.readUInt16LE(4)
-    this.bitCount = buffer.readUInt16LE(6)
-    this.bytesInRes = buffer.readUInt32LE(8)
-    this.imageOffset = buffer.readUInt32LE(12)
-
-    if (this.bitCount !== 32) {
-      // TODO: only 32 bpp supported
-      throw new Error('Only 32 bpp supported')
-    }
   }
 }
