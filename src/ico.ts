@@ -68,7 +68,7 @@ export class Ico {
     const infoHeaders = this._images.map((image) => {
       return new IcoInfoHeader(
         image.header.width < 256 ? image.header.width : 0,
-        image.header.height < 256 ? image.header.height : 0,
+        image.header.height / 2 < 256 ? image.header.height / 2 : 0,
         0,
         0,
         image.header.planes,

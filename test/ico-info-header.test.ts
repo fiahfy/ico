@@ -2,7 +2,7 @@ import { IcoInfoHeader } from '../src'
 
 describe('IcoInfoHeader', () => {
   describe('constructor', () => {
-    test('should work', () => {
+    it('should work', () => {
       const header = new IcoInfoHeader()
       expect(header.width).toBe(0)
       expect(header.height).toBe(0)
@@ -16,7 +16,7 @@ describe('IcoInfoHeader', () => {
   })
 
   describe('from', () => {
-    test('should work', () => {
+    it('should work', () => {
       const buffer = Buffer.alloc(16)
       buffer.writeUInt8(32, 0)
       buffer.writeUInt8(32, 1)

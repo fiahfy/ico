@@ -2,7 +2,7 @@ import { BitmapInfoHeader } from '../src'
 
 describe('BitmapInfoHeader', () => {
   describe('constructor', () => {
-    test('should work', () => {
+    it('should work', () => {
       const header = new BitmapInfoHeader()
       expect(header.size).toBe(40)
       expect(header.width).toBe(0)
@@ -19,7 +19,7 @@ describe('BitmapInfoHeader', () => {
   })
 
   describe('from', () => {
-    test('should work', () => {
+    it('should work', () => {
       const buffer = Buffer.alloc(40)
       buffer.writeUInt32LE(40, 0)
       buffer.writeInt32LE(32, 4)

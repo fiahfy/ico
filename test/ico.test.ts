@@ -3,7 +3,7 @@ import { Ico, IcoImage, IcoFileHeader } from '../src'
 
 describe('Ico', () => {
   describe('constructor', () => {
-    test('should work', () => {
+    it('should work', () => {
       const ico = new Ico()
       expect(ico.fileHeader).toEqual(new IcoFileHeader())
       expect(ico.infoHeaders).toEqual([])
@@ -12,7 +12,7 @@ describe('Ico', () => {
   })
 
   describe('from', () => {
-    test('should work', () => {
+    it('should work', () => {
       const buffer = fs.readFileSync('./test/icon.ico')
       const ico = Ico.from(buffer)
       expect(ico.images.length).toBe(7)
@@ -20,7 +20,7 @@ describe('Ico', () => {
   })
 
   describe('set images', () => {
-    test('should work', () => {
+    it('should work', () => {
       const ico = new Ico()
       const buffer = fs.readFileSync('./test/16x16.png')
       const firstBytes = ico.data.length
@@ -94,10 +94,26 @@ describe('Ico', () => {
       expect(ico.infoHeaders.length).toBe(0)
       expect(ico.data.length).toBe(firstBytes)
     })
+    it('should create valid info header', () => {
+      const ico = new Ico()
+      const buffer = fs.readFileSync('./test/16x16.png')
+      const image = IcoImage.fromPNG(buffer)
+      ico.append(image)
+      expect(ico.infoHeaders[0].width).toBe(16)
+      expect(ico.infoHeaders[0].height).toBe(16)
+      expect(ico.infoHeaders[0].colorCount).toBe(0)
+      expect(ico.infoHeaders[0].reserved).toBe(0)
+      expect(ico.infoHeaders[0].planes).toBe(1)
+      expect(ico.infoHeaders[0].bitCount).toBe(32)
+      expect(ico.infoHeaders[0].bytesInRes).toBe(image.data.length)
+      expect(ico.infoHeaders[0].imageOffset).toBe(
+        ico.fileHeader.data.length + ico.infoHeaders[0].data.length
+      )
+    })
   })
 
   describe('append', () => {
-    test('should work', () => {
+    it('should work', () => {
       const ico = new Ico()
       const buffer = fs.readFileSync('./test/16x16.png')
       let image: IcoImage
@@ -113,7 +129,7 @@ describe('Ico', () => {
   })
 
   describe('insert', () => {
-    test('should work', () => {
+    it('should work', () => {
       const ico = new Ico()
       const buffer = fs.readFileSync('./test/16x16.png')
       let image: IcoImage
@@ -133,7 +149,7 @@ describe('Ico', () => {
   })
 
   describe('remove', () => {
-    test('should work', () => {
+    it('should work', () => {
       const ico = new Ico()
       const buffer = fs.readFileSync('./test/16x16.png')
 

@@ -53,7 +53,7 @@ export class IcoImage {
     }
 
     const width = png.width
-    let height = png.height
+    const height = png.height
     if (width !== height) {
       throw new TypeError('Image must be squre')
     }
@@ -62,9 +62,9 @@ export class IcoImage {
       throw new TypeError('No supported size')
     }
 
-    height *= 2 // image + mask
+    const bpp = 4
     const planes = 1
-    const bitCount = (png as any).bpp * 8 // byte per pixel * 8
+    const bitCount = bpp * 8 // byte per pixel * 8
 
     const xors = []
     let andBits: number[] = []
@@ -73,7 +73,7 @@ export class IcoImage {
     for (let y = height - 1; y >= 0; y--) {
       for (let x = 0; x < width; x++) {
         // RGBA to BGRA
-        const pos = (y * width + x) * (png as any).bpp
+        const pos = (y * width + x) * bpp
         const red = png.data.slice(pos, pos + 1)
         const green = png.data.slice(pos + 1, pos + 2)
         const blue = png.data.slice(pos + 2, pos + 3)
@@ -84,8 +84,7 @@ export class IcoImage {
         xors.push(alpha)
         andBits.push(alpha.readUInt8(0) === 0 ? 1 : 0)
       }
-      const padding: number =
-        andBits.length % 32 ? 32 - (andBits.length % 32) : 0
+      const padding = andBits.length % 32 ? 32 - (andBits.length % 32) : 0
       andBits = andBits.concat(Array(padding).fill(0))
     }
 
@@ -103,7 +102,7 @@ export class IcoImage {
     const header = new BitmapInfoHeader(
       40,
       width,
-      height,
+      height * 2, // image + mask
       planes,
       bitCount,
       0,

@@ -2,7 +2,7 @@ import { IcoFileHeader } from '../src'
 
 describe('IcoFileHeader', () => {
   describe('constructor', () => {
-    test('should work', () => {
+    it('should work', () => {
       const header = new IcoFileHeader()
       expect(header.reserved).toBe(0)
       expect(header.type).toBe(1)
@@ -11,7 +11,7 @@ describe('IcoFileHeader', () => {
   })
 
   describe('from', () => {
-    test('should work', () => {
+    it('should work', () => {
       const buffer = Buffer.alloc(6)
       buffer.writeUInt16LE(1, 0)
       buffer.writeUInt16LE(2, 2)
