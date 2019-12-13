@@ -17,7 +17,7 @@ npm install @fiahfy/ico
 
 ```js
 import fs from 'fs'
-import Ico from '@fiahfy/ico'
+import { Ico } from '@fiahfy/ico'
 
 const buf = fs.readFileSync('icon.ico')
 const ico = Ico.from(buf)
@@ -29,7 +29,7 @@ console.log(ico.infoHeaders[0]) // IcoInfoHeader { width: 16, height: 16, ... }
 
 ```js
 import fs from 'fs'
-import Ico from '@fiahfy/ico'
+import { Ico, IcoImage } from '@fiahfy/ico'
 
 const ico = new Ico()
 let buf
