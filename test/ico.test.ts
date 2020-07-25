@@ -156,7 +156,7 @@ describe('Ico', () => {
       ico.images = [
         IcoImage.fromPNG(buffer),
         IcoImage.fromPNG(buffer),
-        IcoImage.fromPNG(buffer)
+        IcoImage.fromPNG(buffer),
       ]
       expect(ico.images.length).toBe(3)
 

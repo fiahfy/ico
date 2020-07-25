@@ -104,7 +104,7 @@ export class Ico {
     const buffers = [
       this._fileHeader.data,
       ...this._infoHeaders.map((infoHeader) => infoHeader.data),
-      ...this._images.map((image) => image.data)
+      ...this._images.map((image) => image.data),
     ]
     return Buffer.concat(buffers)
   }
@@ -126,7 +126,7 @@ export class Ico {
     this.images = [
       ...this.images.slice(0, index),
       image,
-      ...this.images.slice(index + 1)
+      ...this.images.slice(index + 1),
     ]
   }
 
@@ -137,7 +137,7 @@ export class Ico {
   remove(index: number): void {
     this.images = [
       ...this.images.slice(0, index),
-      ...this.images.slice(index + 1)
+      ...this.images.slice(index + 1),
     ]
   }
 }
